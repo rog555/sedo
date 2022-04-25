@@ -1,0 +1,165 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: 'AWS::Serverless-2016-10-31'
+Description: Serverless Event Driven Orchestrator
+Resources:
+
+  SedoExecutionProcessorQueue:
+    Type: 'AWS::SQS::Queue'
+    Properties:
+      QueueName: sedo_execution-processor-queue
+      KmsMasterKeyId: alias/aws/sqs
+      VisibilityTimeout: 30
+      MessageRetentionSeconds: 86400  # 1 day
+
+  SedoDefinitionTable:
+    Type: 'AWS::DynamoDB::Table'
+    Properties:
+      TableName: sedo_definition
+      AttributeDefinitions:
+        - AttributeName: tenantId
+          AttributeType: S
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: tenantId
+          AttributeType: HASH
+        - AttributeName: id
+          AttributeType: RANGE
+
+  SedoExecutionTable:
+    Type: 'AWS::DynamoDB::Table'
+    Properties:
+      TableName: sedo_execution
+      AttributeDefinitions:
+        - AttributeName: tenantId
+          AttributeType: S
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: tenantId
+          AttributeType: HASH
+        - AttributeName: id
+          AttributeType: RANGE
+
+  SedoExecutionProcessorFunction:
+    Type: 'AWS::Serverless::Function'
+    Properties:
+      Handler: index.handler
+      Runtime: python3.8
+      CodeUri: functions/sedo_execution-processor
+      FunctionName: sedo_execution-processor
+      Description: Serverless Event Driven Orchestrator Execution Processor
+      MemorySize: 1024
+      Timeout: 30
+      Policies:
+        - SQSPollerPolicy:
+            QueueName: !Ref SedoExecutionProcessorQueue
+        - DynamoDBReadPolicy:
+            TableName: !Ref SedoDefinitionTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref SedoExecutionTable
+        - Statement:
+          - Sid: SendMessage
+            Effect: Allow
+            Action:
+              - sqs:SendMessage
+              - sqs:GetQueueUrl
+            Resource:
+              - 'Fn::GetAtt': [SedoExecutionProcessorQueue, Arn]
+          - Sid: KmsAccess
+            Effect: Allow
+            Action:
+              - kms:GenerateDataKey*
+              - kms:Decrypt
+              - kms:Encrypt
+            Resource:
+              - 'Fn::Sub': arn:aws:kms::${AWS::AccountId}:alias/aws/sqs
+      Events:
+        BatchSQSEvent:
+         Type: SQS
+         Properties:
+           Queue: !Ref SedoExecutionProcessorQueue
+           BatchSize: 1
+
+  SedoApi:
+    Type: 'AWS::Serverless::Function'
+    Properties:
+      Handler: index.handler
+      Runtime: python3.8
+      CodeUri: functions/sedo_api
+      FunctionName: sedo_api
+      Description: Serverless Event Driven Orchestrator API
+      MemorySize: 1024
+      Timeout: 30
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref SedoDefinitionTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref SedoExecutionTable
+        - Statement:
+          - Sid: SendMessage
+            Effect: Allow
+            Action:
+              - sqs:SendMessage
+              - sqs:GetQueueUrl
+            Resource:
+              - 'Fn::GetAtt': [SedoExecutionProcessorQueue, Arn]
+          - Sid: KmsAccess
+            Effect: Allow
+            Action:
+              - kms:GenerateDataKey*
+              - kms:Encrypt
+            Resource:
+              - 'Fn::Sub': arn:aws:kms::${AWS::AccountId}:alias/aws/sqs
+      Events:
+        ProxyApi:
+          Type: Api
+          Properties:
+            Path: /{proxy+}
+            Method: ANY
+
+  ServerlessRestApi:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Body:
+        swagger: '2.0'
+        info:
+          version: '1.0'
+          title: 'Sedo API'
+        paths:
+          /sedo/{proxy+}:
+            get:
+              x-amazon-apigateway-integration:
+                httpMethod: POST
+                type: aws_proxy
+                uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${SedoApi.Arn}/invocations'
+              responses: {}
+            options:
+              summary: CORS support
+              consumes:
+                - application/json
+              produces:
+                - application/json
+              x-amazon-apigateway-integration:
+                type: mock
+                requestTemplates:
+                  application/json: "{\n  \"statusCode\" : 200\n}\n"
+                responses:
+                  default:
+                    statusCode: '200'
+                    responseTemplates:
+                      application/json: "{}\n"
+                    responseParameters:
+                      method.response.header.Access-Control-Allow-Origin: '''*'''
+                      method.response.header.Access-Control-Allow-Methods: '''DELETE,GET,HEAD,OPTIONS,PATCH,POST,PUT'''
+                      method.response.header.Access-Control-Allow-Headers: '''Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'''
+              responses:
+                '200':
+                  description: Default response for CORS method
+                  headers:
+                    Access-Control-Allow-Origin:
+                      type: string
+                    Access-Control-Allow-Headers:
+                      type: string
+                    Access-Control-Allow-Methods:
+                      type: string

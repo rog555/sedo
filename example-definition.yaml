@@ -1,0 +1,24 @@
+
+inputSchema:
+  type: object
+  properties:
+    foo:
+      type: string
+  required: [foo]
+  additionalProperties: false
+
+steps:
+  - id: initial-echo
+    type: echo
+    message: initial echo
+    next: wait-some-time
+
+  - id: wait-some-time
+    type: wait
+    seconds: 45
+    next: last-echo
+
+  - id: last-echo
+    type: echo
+    message: last echo
+    end: true

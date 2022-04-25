@@ -1,0 +1,176 @@
+swagger: "2.0"
+
+info:
+  title: SEDO API
+  description: Service Event Driven Orchestration API
+  version: "1"
+
+basePath: /sedo
+
+parameters:
+  tenantId:
+    name: tenantId
+    description: tenant ID
+    in: path
+    required: true
+    type: string
+  id:
+    in: path
+    description: definition or execution ID
+    name: id
+    required: true
+    type: string
+    pattern: "^[a-z0-9-]+$"
+
+responses:
+  BadRequest:
+    description: Bad Request
+    schema:
+      $ref: "#/definitions/Problem"
+  Created:
+    description: Created
+  NoContent:
+    description: No Content
+  NotFound:
+    description: Not Found
+    schema:
+      $ref: "#/definitions/Problem"
+  Unauthorized:
+    description: Unauthorized
+    schema:
+      $ref: "#/definitions/Problem"
+
+paths:
+
+  /tenants/{tenantId}/definitions:
+    get:
+      summary: get definitions
+      operationId: api.get_definitions
+      parameters:
+        - $ref: '#/parameters/tenantId'
+      responses:
+        200:
+          description: definitions
+    post:
+      summary: create definition
+      operationId: api.create_definition
+      parameters:
+        - $ref: '#/parameters/tenantId'
+        - name: createDefinitionRequest
+          in: body
+          description: created definition
+          required: true
+          schema:
+            $ref: '#/definitions/createDefinitionRequest'
+      responses:
+        201:
+          description: created
+
+  /tenants/{tenantId}/definitions/{id}:
+    get:
+      summary: get definition
+      operationId: api.get_definition
+      parameters:
+        - $ref: '#/parameters/tenantId'
+        - $ref: '#/parameters/id'
+      responses:
+        200:
+          description: definitions
+
+  /tenants/{tenantId}/definitions/{id}/execute:
+    post:
+      summary: get definition
+      operationId: api.execute_definition
+      parameters:
+        - $ref: '#/parameters/tenantId'
+        - $ref: '#/parameters/id'
+        - name: createExecutionRequest
+          in: body
+          description: create execution
+          required: true
+          schema:
+            $ref: '#/definitions/createExecutionRequest'
+      responses:
+        201:
+          description: executed
+
+  /tenants/{tenantId}/executions:
+    get:
+      summary: get executions
+      operationId: api.get_executions
+      responses:
+        200:
+          description: executions
+
+  /tenants/{tenantId}/executions/{id}:
+    get:
+      summary: get execution
+      operationId: api.get_execution
+      responses:
+        200:
+          description: executions
+
+definitions:
+  # Schema for error response body
+  # https://tools.ietf.org/html/draft-ietf-appsawg-http-problem-00
+  Problem:
+    type: object
+    properties:
+      detail:
+        type: string
+      status:
+        type: number
+      title:
+        type: string
+      type:
+        type: string
+    required: ['detail', 'status', 'title', 'type']
+
+  createExecutionRequest:
+    type: object
+    properties:
+      input:
+        type: object
+        description: execution request input
+    required: [input]
+    additionalProperties: false
+
+  createDefinitionRequest:
+    type: object
+    properties:
+      id:
+        type: string
+        pattern: '^[a-z0-9-]+$'
+      inputSchema:
+        type: object
+      steps:
+        type: array
+        items:
+          type: object
+          properties:
+            id:
+              type: string
+              pattern: '^[a-z0-9-]+$'
+            type:
+              type: string
+              enum:
+                - wait
+                - echo
+            next:
+              type: string
+              pattern: '^[a-z0-9-]+$'
+            end:
+              type: boolean
+            seconds:
+              type: number
+              minimum: 10
+            message:
+              type: string
+          required:
+            - id
+            - type
+    required:
+      - id
+      - inputSchema
+      - steps
+    additionalProperties: false
