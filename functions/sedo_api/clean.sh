@@ -1,7 +1,7 @@
 #!/bin/bash
 rm -rf *.dist-info
 rm -rf __pycache__
-rm -f _*
+rm -rf _*
 rm -f *.so
 rm -rf attr
 rm -rf attrs

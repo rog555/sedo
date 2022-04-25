@@ -13,7 +13,7 @@ def handler(event, context):
     global APP
     try:
         if APP is None:
-            APP = connexion.FlaskApp(__name__)
+            APP = connexion.FlaskApp(__name__, options={'swagger_ui': False})
             APP.add_api('api.yaml')
             CORS(APP.app)
         return awsgi.response(APP, event, context)

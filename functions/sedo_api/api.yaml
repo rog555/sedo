@@ -14,13 +14,14 @@ parameters:
     in: path
     required: true
     type: string
+    pattern: "^[a-z0-9]+$"
   id:
     in: path
     description: definition or execution ID
     name: id
     required: true
     type: string
-    pattern: "^[a-z0-9-]+$"
+    pattern: "^[a-z0-9:-]+$"
 
 responses:
   BadRequest:
@@ -98,6 +99,8 @@ paths:
     get:
       summary: get executions
       operationId: api.get_executions
+      parameters:
+        - $ref: '#/parameters/tenantId'
       responses:
         200:
           description: executions
@@ -106,6 +109,9 @@ paths:
     get:
       summary: get execution
       operationId: api.get_execution
+      parameters:
+        - $ref: '#/parameters/tenantId'
+        - $ref: '#/parameters/id'
       responses:
         200:
           description: executions

@@ -1,17 +1,25 @@
 #!/usr/bin/env python
-import boto3
+from boto3.session import Session
+from boto3.dynamodb.conditions import Key
+from boto3.dynamodb.types import Decimal
+from datetime import datetime
 import json
 from jsonschema import validate
+import os
 import traceback
 from uuid import uuid4
 
 
+def get_session():
+    return Session(region_name=os.environ.get('AWS_REGION', 'us-east-1'))
+
+
 def get_table(name):
-    return boto3.resource('dynamodb').Table(name)
+    return get_session().resource('dynamodb').Table(name)
 
 
 def get_client(name):
-    return boto3.client(name)
+    return get_session().client(name)
 
 
 def problem(title, detail=None, status=400, type=None):
@@ -48,11 +56,24 @@ def get_key(tenantId, id):
     }
 
 
-def query(entity, tenantId, id=None):
+def json_serial(obj):
+    if isinstance(obj, datetime):
+        return obj.isoformat()
+    if isinstance(obj, Decimal):
+        if obj % 1 > 0:
+            return float(obj)
+        else:
+            return int(obj)
+    if isinstance(obj, set):
+        return list(obj)
+    raise TypeError('type not serializable')
+
+
+def query(entity, tenantId, id=None, attributes=None):
     table = get_table(entity)
 
     def _item(item):
-        return json.loads(json.dumps(item))
+        return json.loads(json.dumps(item, default=json_serial))
 
     # get by ID
     if tenantId is not None and id is not None:
@@ -62,11 +83,26 @@ def query(entity, tenantId, id=None):
         except Exception as e:
             return log_exception('unable to get %s' % entity, e)
         if 'Item' not in response:
-            return problem('%s not found' % entity, status=404)
+            return problem(
+                '%s not found' % entity.replace('sedo_', ''), status=404
+            )
         return _item(response['Item']), 200
 
-    # query
-    kwargs = {}
+    kwargs = {
+        'KeyConditionExpression': Key('tenantId').eq(tenantId)
+    }
+
+    if isinstance(attributes, list):
+        kwargs.update({
+            'ProjectionExpression': ', '.join([
+                '#%s' % a for a in attributes
+            ]),
+            'ExpressionAttributeNames': {},
+            'Select': 'SPECIFIC_ATTRIBUTES'
+        })
+    for a in attributes:
+        kwargs['ExpressionAttributeNames']['#%s' % a] = a
+
     response = []
     last_key = None
     try:
@@ -85,7 +121,7 @@ def query(entity, tenantId, id=None):
     return response, 200
 
 
-def write(entity, vals, update=False):
+def write(entity, vals, update=False, return_vals=None):
     title = 'unable to %s %s' % (
         'update' if update is True else 'create',
         entity
@@ -125,6 +161,8 @@ def write(entity, vals, update=False):
         else:
             vals.update(key)
             table.put_item(Item=vals)
+        if isinstance(return_vals, list):
+            vals = {k: vals[k] for k in return_vals}
         return vals, 201
     except Exception as e:
         return log_exception(title, e)
@@ -145,19 +183,22 @@ def delete(entity, vals):
 
 def get_definitions(tenantId):
     print('get_definitions(%s)' % tenantId)
-    return query('sedo_definitions', tenantId)
+    return query('sedo_definition', tenantId, attributes=['tenantId', 'id'])
 
 
 def create_definition(tenantId, createDefinitionRequest):
     print('create_definition(%s)' % tenantId)
-    return write('sedo_execution', {
-        'tenantId': tenantId
-    }.update(createDefinitionRequest))
+    createDefinitionRequest['tenantId'] = tenantId
+    return write(
+        'sedo_definition',
+        createDefinitionRequest,
+        return_vals=['tenantId', 'id']
+    )
 
 
 def get_definition(tenantId, id):
     print('get_definition(%s, %s)' % (tenantId, id))
-    return query('sedo_definitions', tenantId, id)
+    return query('sedo_definition', tenantId, id)
 
 
 def execute_definition(tenantId, id, createExecutionRequest):
@@ -169,13 +210,17 @@ def execute_definition(tenantId, id, createExecutionRequest):
     response = {
         'tenantId': tenantId,
         'definitionId': id,
-        'id': str(uuid4()).split('-')[0],
+        'id': '%s:%s:%s' % (
+            tenantId,
+            id,
+            str(uuid4()).split('-')[0]
+        ),
         'state': 'ExecutionSubmitted'
     }
     event = {
-        'input': createExecutionRequest['input'],
-        'definition': definition
-    }.update(response)
+        'input': createExecutionRequest['input']
+    }
+    event.update(response)
 
     # validate input
     try:
@@ -186,7 +231,9 @@ def execute_definition(tenantId, id, createExecutionRequest):
         )
 
     # write to table
-    write('sedo_execution', event)
+    r, code = write('sedo_execution', event)
+    if code != 201:
+        return r, code
 
     # dispatch to queue
     client = get_client('sqs')
@@ -204,9 +251,13 @@ def execute_definition(tenantId, id, createExecutionRequest):
 
 def get_executions(tenantId):
     print('get_executions(%s)' % (tenantId))
-    return query('sedo_executions', tenantId)
+    return query(
+        'sedo_execution',
+        tenantId,
+        attributes=['tenantId', 'id', 'state', 'step']
+    )
 
 
 def get_execution(tenantId, id):
     print('get_execution(%s, %s)' % (tenantId, id))
-    return query('sedo_executions', tenantId, id)
+    return query('sedo_execution', tenantId, id)
