@@ -117,7 +117,7 @@ The following infrastructure will be created
 Once deployed, get your AWS Rest API ID for `sedo-stack` 
 
 ```
-export INVOKE_URL=https://h4gy3l4e5j.execute-api.us-east-1.amazonaws.com/Prod
+export INVOKE_URL=https://abcdef1234.execute-api.us-east-1.amazonaws.com/Prod
 ```
 
 1) Create definition for tenant 123
