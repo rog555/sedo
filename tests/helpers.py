@@ -1,3 +1,16 @@
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
 import boto3
 from boto3.session import Session
 import json
@@ -60,7 +73,7 @@ def create_dynamodb_table(table_name, keys=None):
             'AttributeType': atype.upper()
         })
     dynamodb.create_table(**kwargs)
-    print('created table %s' % table_name)
+    # print('created table %s' % table_name)
 
 
 def create_queue(queue_name):
@@ -78,7 +91,7 @@ def create_queue(queue_name):
             })
         }
     )
-    print('created queue %s' % queue_name)
+    # print('created queue %s' % queue_name)
 
 
 def get_queue_url(queue):
@@ -109,6 +122,12 @@ def create_infra():
     create_dynamodb_table('sedo_definition')
     create_dynamodb_table('sedo_execution')
     create_queue('sedo_execution-processor-queue')
+
+
+def load_dynamodb_data(table_name, items):
+    table = get_session().resource('dynamodb').Table(table_name)
+    for item in items:
+        table.put_item(Item=item)
 
 
 class invoke(object):

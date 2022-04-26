@@ -1,7 +1,20 @@
 #!/usr/bin/env python
-from boto3.session import Session
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
 from boto3.dynamodb.conditions import Key
 from boto3.dynamodb.types import Decimal
+from boto3.session import Session
 from datetime import datetime
 import json
 from jsonschema import validate
@@ -121,9 +134,8 @@ def query(entity, tenantId, id=None, attributes=None):
     return response, 200
 
 
-def write(entity, vals, update=False, return_vals=None):
-    title = 'unable to %s %s' % (
-        'update' if update is True else 'create',
+def write(entity, vals, return_vals=None):
+    title = 'unable to create %s' % (
         entity
     )
     hk_attr = 'tenantId'
@@ -133,34 +145,8 @@ def write(entity, vals, update=False, return_vals=None):
     vals.pop('id', None)
     try:
         table = get_table(entity)
-        if update is True:
-            kwargs = {
-                'Key': key,
-                'ReturnValues': 'ALL_NEW'
-            }
-            exp = []
-            _vals = {}
-            aliases = {}
-            for k, v in vals.items():
-                if isinstance(v, str) and v == '':
-                    v = None
-                aliases['#%s' % k] = k
-                if isinstance(v, list):
-                    exp.append('#%s = list_append(#%s, :%s)' % (k, k, k))
-                    _vals[':%s' % k] = v
-                else:
-                    exp.append('#%s = :%s' % (k, k))
-                    _vals[':%s' % k] = v
-            if len(_vals):
-                kwargs['ExpressionAttributeValues'] = _vals
-                kwargs['UpdateExpression'] = 'SET %s' % ', '.join(exp)
-            if len(aliases):
-                kwargs['ExpressionAttributeNames'] = aliases
-                response = table.update_item(**kwargs)
-                vals.update(response.get('Attributes'))
-        else:
-            vals.update(key)
-            table.put_item(Item=vals)
+        vals.update(key)
+        table.put_item(Item=vals)
         if isinstance(return_vals, list):
             vals = {k: vals[k] for k in return_vals}
         return vals, 201
@@ -209,7 +195,6 @@ def execute_definition(tenantId, id, createExecutionRequest):
         return (definition, code)
     response = {
         'tenantId': tenantId,
-        'definitionId': id,
         'id': '%s:%s:%s' % (
             tenantId,
             id,
@@ -231,11 +216,13 @@ def execute_definition(tenantId, id, createExecutionRequest):
         )
 
     # write to table
-    r, code = write('sedo_execution', event)
+    execution_data = event.copy()
+    execution_data.update({'definition': definition})
+    r, code = write('sedo_execution', execution_data)
     if code != 201:
         return r, code
 
-    # dispatch to queue
+    # dispatch event to queue
     client = get_client('sqs')
     queue_url = client.get_queue_url(
         QueueName='sedo_execution-processor-queue'

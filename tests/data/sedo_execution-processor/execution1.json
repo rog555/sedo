@@ -1,0 +1,46 @@
+[
+    {
+        "definition": {
+            "id": "definition1",
+            "inputSchema": {
+            "additionalProperties": false,
+            "properties": {
+                "foo": {
+                "type": "string"
+                }
+            },
+            "required": [
+                "foo"
+            ],
+            "type": "object"
+            },
+            "steps": [
+            {
+                "id": "initial-echo",
+                "message": "initial echo",
+                "next": "wait-some-time",
+                "type": "echo"
+            },
+            {
+                "id": "wait-some-time",
+                "next": "last-echo",
+                "seconds": 1,
+                "type": "wait"
+            },
+            {
+                "end": true,
+                "id": "last-echo",
+                "message": "last echo",
+                "type": "echo"
+            }
+            ],
+            "tenantId": "123"
+        },
+        "id": "123:definition1:35c22d5e",
+        "input": {
+            "foo": "bar"
+        },
+        "state": "ExecutionSubmitted",
+        "tenantId": "123"
+    }
+]

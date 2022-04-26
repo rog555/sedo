@@ -1,7 +1,20 @@
-import os
-import sys
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
 from moto import mock_dynamodb2
 from moto import mock_sqs
+import os
+import sys
 from tests import helpers as h
 
 BASE_PATH = '/sedo/tenants/123'
@@ -101,7 +114,6 @@ def test_execution_api():
     execution_id = r.json['id']
     assert execution_id.startswith('123:definition1:')
     assert len(execution_id) == len('123:definition1:12345678')
-    assert r.json['definitionId'] == 'definition1'
     assert r.json['state'] == 'ExecutionSubmitted'
     assert r.json['tenantId'] == '123'
 
@@ -118,22 +130,25 @@ def test_execution_api():
     }]
 
     # get specific execution
+    print('getting execution')
     r = h.invoke(
         handler,
         'GET',
         BASE_PATH + '/executions/' + execution_id
     )
+    definition['tenantId'] = '123'
     expected = {
         "input": {
             "foo": "bar"
         },
-        "definitionId": "definition1",
         "state": "ExecutionSubmitted",
         "tenantId": "123",
-        "id": execution_id
+        "id": execution_id,
+        'definition': definition
     }
     assert r.json == expected
 
     # check dispatched messages on queue
+    expected.pop('definition', None)
     events = h.get_queue_messages('sedo_execution-processor-queue')
     assert events == [expected]
