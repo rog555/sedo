@@ -9,7 +9,7 @@ Resources:
       QueueName: sedo_execution-processor-queue
       KmsMasterKeyId: alias/aws/sqs
       VisibilityTimeout: 30
-      MessageRetentionSeconds: 86400  # 1 day
+      MessageRetentionPeriod: 86400  # 1 day
 
   SedoDefinitionTable:
     Type: 'AWS::DynamoDB::Table'
@@ -22,9 +22,9 @@ Resources:
           AttributeType: S
       KeySchema:
         - AttributeName: tenantId
-          AttributeType: HASH
+          KeyType: HASH
         - AttributeName: id
-          AttributeType: RANGE
+          KeyType: RANGE
 
   SedoExecutionTable:
     Type: 'AWS::DynamoDB::Table'
@@ -37,9 +37,9 @@ Resources:
           AttributeType: S
       KeySchema:
         - AttributeName: tenantId
-          AttributeType: HASH
+          KeyType: HASH
         - AttributeName: id
-          AttributeType: RANGE
+          KeyType: RANGE
 
   SedoExecutionProcessorFunction:
     Type: 'AWS::Serverless::Function'
@@ -76,10 +76,11 @@ Resources:
               - 'Fn::Sub': arn:aws:kms::${AWS::AccountId}:alias/aws/sqs
       Events:
         BatchSQSEvent:
-         Type: SQS
-         Properties:
-           Queue: !Ref SedoExecutionProcessorQueue
-           BatchSize: 1
+          Type: SQS
+          Properties:
+            Queue:
+              'Fn::GetAtt': [SedoExecutionProcessorQueue, Arn]
+            BatchSize: 1
 
   SedoApi:
     Type: 'AWS::Serverless::Function'
@@ -118,7 +119,7 @@ Resources:
             Path: /{proxy+}
             Method: ANY
 
-  ServerlessRestApi:
+  SedoRestApi:
     Type: AWS::ApiGateway::RestApi
     Properties:
       Body:

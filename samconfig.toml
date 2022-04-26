@@ -1,0 +1,10 @@
+version=0.1
+[default.global.parameters]
+stack_name = "sedo-stack"
+
+[default.deploy.parameters]
+region = "us-east-1"
+confirm_changeset = true
+capabilities = "CAPABILITY_IAM"
+image_repositories = []
+
