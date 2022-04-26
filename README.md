@@ -37,15 +37,24 @@ steps:
 
 ## Architecture ##
 
-sedo differs to AWS Step Functions, as it should scale greater and cost less as it is simple lambda and SQS event processing.  Sedo uses the [Connexion](https://connexion.readthedocs.io/en/latest/) framework for Swagger driven APIs
+sedo differs to AWS Step Function in that only AWS Lambda and SQS are used to asynchronously orchestrate workflows.  Although Step Functions is invoked aysnchronously, it internally executes and monitors state machines synchronously in order to handle errors.  
 
-Some rationale driving the architecture & design:
+Some of the design factors driving the sedo architecture:
+
+1) AWS Step Functions can be complex to author and test - with often very large config files that are hard to maintain with many developers
+2) Workflows need to be composible of other workflows - not a feature originally released with Step Functions (though subsequently supported)
+3) A pure serverless event driven based architecture should scale greater and cost less than Step Functions.
+
+Some interesting perspectives (granted, most of these are early 2018/2019 and so may no longer be relevant)
 
 * [Building Serverless State Machines](https://www.stackery.io/blog/serverless-state-machines/)
 * [Serverless Steps](https://hackernoon.com/serverless-steps-8a43eac354e1)
 * [aws-lambda-fsm-workflows](https://github.com/Workiva/aws-lambda-fsm-workflows/blob/master/docs/OVERVIEW.md)
 * [Heavyside](https://github.com/benkehoe/heaviside)
 * [Comparison of FaaS Orchestration Systems](https://arxiv.org/pdf/1807.11248.pdf)
+* [Serverless Workflow](https://serverlessworkflow.io/)
+
+### Dealing with timeouts
 
 As mentioned in blog post [here](https://medium.com/@zaccharles/there-is-more-than-one-way-to-schedule-a-task-398b4cdc2a75), there are various ways to handle timeouts
 
@@ -59,10 +68,11 @@ SQS Delay Queues probably the best approach, with 30 or 60 seconds triggering a 
 
 sedo does not currently separate out processing into separate delay and processing queues, though this approach has been used with success in production elsewhere
 
-### Other Architecture Considerations
+### Other Design Considerations
 
 The following should be implemented in a production system (and have been elsewhere...)
 
+* Sedo uses the [Connexion](https://connexion.readthedocs.io/en/latest/) Python framework for Swagger driven APIs.
 * Use [React JsonSchema Form](https://rjsf-team.github.io/react-jsonschema-form/) for UI to drive input based on definition inputSchema
 * Expand multiple step types, to do actual useful things such as call APIs, transform data etc
 * Governance/monitor of executions via separate timeouts
