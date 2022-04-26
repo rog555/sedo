@@ -25,6 +25,9 @@ Resources:
           KeyType: HASH
         - AttributeName: id
           KeyType: RANGE
+      ProvisionedThroughput:
+        ReadCapacityUnits: 1
+        WriteCapacityUnits: 1
 
   SedoExecutionTable:
     Type: 'AWS::DynamoDB::Table'
@@ -40,6 +43,9 @@ Resources:
           KeyType: HASH
         - AttributeName: id
           KeyType: RANGE
+      ProvisionedThroughput:
+        ReadCapacityUnits: 1
+        WriteCapacityUnits: 1
 
   SedoExecutionProcessorFunction:
     Type: 'AWS::Serverless::Function'

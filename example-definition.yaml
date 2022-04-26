@@ -1,4 +1,6 @@
 
+id: example-definition
+
 inputSchema:
   type: object
   properties:
